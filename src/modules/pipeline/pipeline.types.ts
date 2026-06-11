@@ -1,6 +1,6 @@
 export interface PipelineStepSummary {
   name: string;
-  status: 'completed';
+  status: 'completed' | 'failed';
   meta: Record<string, unknown>;
 }
 

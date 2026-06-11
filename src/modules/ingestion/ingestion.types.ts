@@ -6,3 +6,11 @@ export interface IngestionResult {
   persistedCount: number;
   items: SourceItemInput[];
 }
+
+export interface IngestionSourceResult {
+  source: string;
+  status: 'completed' | 'skipped' | 'failed';
+  fetchedCount: number;
+  persistedCount: number;
+  message?: string;
+}

@@ -8,7 +8,7 @@ interface RedditTokenCache {
 
 let tokenCache: RedditTokenCache | null = null;
 
-function hasRedditCredentials(): boolean {
+export function hasRedditCredentials(): boolean {
   return Boolean(env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET);
 }
 

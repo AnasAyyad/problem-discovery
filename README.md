@@ -48,7 +48,15 @@ This keeps the workflow local-first and auditable while still using AI where it 
 
 ### 1. Ingestion
 
-The current pipeline ingests Reddit posts and stores each source item with metadata and the raw payload.
+The pipeline can ingest from multiple sources and stores each source item with metadata and the raw payload.
+
+Current sources:
+
+- Reddit hot posts for a target subreddit
+- Hacker News search results using global discovery keywords
+- Direct web pages from a configured URL list
+
+Reddit is optional. If credentials are missing or Reddit fails, the pipeline now skips or records the failure and continues with the other sources.
 
 ### 2. Embeddings
 
@@ -118,12 +126,72 @@ Cluster labels are normalized before grouping, which reduces fragmentation cause
 
 Updating an existing source item now refreshes its `content_hash`, keeping deduplication metadata aligned with the current normalized text.
 
+### More resilient ingestion
+
+Ingestion is now source-by-source instead of all-or-nothing:
+
+- Reddit is skipped if credentials are not configured.
+- A failure in one source no longer stops the full pipeline.
+- The ingest step returns per-source status so you can see what was completed, skipped, or failed.
+
 ## Current Limits
 
-- Reddit is still the main live source today.
-- Web ingestion is scaffolded but not implemented yet.
+- Reddit still benefits from proper credentials for better coverage.
+- Web ingestion is currently page-fetch based and works best for a curated list of URLs.
 - Clustering is normalized-key based today, not true vector similarity clustering yet.
 - There are still no automated tests.
+
+## Source Configuration
+
+### Optional Reddit credentials
+
+If you have them:
+
+- `REDDIT_CLIENT_ID`
+- `REDDIT_CLIENT_SECRET`
+- `REDDIT_USER_AGENT`
+
+If you do not, the pipeline will skip Reddit and continue.
+
+### Global discovery keywords
+
+Use `DISCOVERY_KEYWORDS` as a comma-separated list, for example:
+
+`DISCOVERY_KEYWORDS=spreadsheet,manual process,inventory,reconciliation,procurement`
+
+### Direct web ingestion
+
+Use `WEB_INGEST_URLS` as a comma-separated list, for example:
+
+`WEB_INGEST_URLS=https://example.com/post-1,https://example.com/post-2`
+
+## CLI Commands
+
+### Unified ingestion
+
+Run just the ingestion step:
+
+```bash
+npm run ingest:run
+```
+
+Optional overrides:
+
+```bash
+npm run ingest:run -- smallbusiness --keywords "spreadsheet,manual process,inventory reconciliation"
+```
+
+### Full pipeline
+
+```bash
+npm run pipeline:run
+```
+
+Optional overrides:
+
+```bash
+npm run pipeline:run -- smallbusiness --keywords "spreadsheet,manual process" --embed-limit 100 --extract-limit 50
+```
 
 ## Notes
 
