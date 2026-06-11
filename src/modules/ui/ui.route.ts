@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync } from "fastify";
 
 function renderUiPage(): string {
   return `<!DOCTYPE html>
@@ -6,7 +6,7 @@ function renderUiPage(): string {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hunter</title>
+    <title>Product Discovery</title>
     <style>
       :root {
         --bg: #f6f3ef;
@@ -161,7 +161,9 @@ function renderUiPage(): string {
 
       .pill.idle { background: #efebe6; color: var(--muted); }
       .pill.running { background: #f8efd7; color: var(--yellow); }
+      .pill.stopping { background: #f5e3cc; color: var(--brand-dark); }
       .pill.completed { background: #dff0e8; color: var(--green); }
+      .pill.cancelled { background: #efe8de; color: var(--muted); }
       .pill.failed { background: #f6dfdb; color: var(--red); }
 
       .progress {
@@ -225,6 +227,7 @@ function renderUiPage(): string {
       }
 
       .step-item.running .step-dot { background: var(--yellow); }
+      .step-item.cancelled .step-dot { background: var(--brand-dark); }
       .step-item.completed .step-dot { background: var(--green); }
       .step-item.failed .step-dot { background: var(--red); }
 
@@ -312,6 +315,34 @@ function renderUiPage(): string {
       .results-head span {
         color: var(--muted);
         font-size: 13px;
+      }
+
+      .results-head-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .icon-button {
+        width: 40px;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border-radius: 12px;
+        background: #f7f0e8;
+        color: var(--brand-dark);
+        border: 1px solid var(--line);
+      }
+
+      .icon-button svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .icon-button:hover:not(:disabled) {
+        background: #efe3d6;
       }
 
       .accordion-list {
@@ -469,7 +500,7 @@ function renderUiPage(): string {
   <body>
     <div class="page">
       <div class="header">
-        <h1>Hunter</h1>
+        <h1>Product Discovery</h1>
         <p>Run discovery, review progress like a job log, and keep the opportunity list manageable by ignoring what you do not want to see again.</p>
       </div>
 
@@ -504,7 +535,7 @@ function renderUiPage(): string {
 
           <div class="actions">
             <button id="runButton" class="primary" type="submit">Run</button>
-            <button id="refreshButton" class="secondary" type="button">Refresh Opportunities</button>
+            <button id="stopButton" class="secondary" type="button" disabled>Stop</button>
           </div>
         </form>
       </section>
@@ -547,6 +578,14 @@ function renderUiPage(): string {
             <strong id="resultsTitle">Opportunities</strong>
             <span id="resultsSubtitle">Showing 5 per page. Ignored items stay hidden.</span>
           </div>
+          <div class="results-head-actions">
+            <button id="refreshOpportunitiesButton" class="icon-button" type="button" aria-label="Refresh opportunities" title="Refresh opportunities">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                <path d="M21 3v6h-6" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div id="opportunityList" class="accordion-list">
@@ -574,7 +613,8 @@ function renderUiPage(): string {
 
       const form = document.getElementById('pipeline-form');
       const runButton = document.getElementById('runButton');
-      const refreshButton = document.getElementById('refreshButton');
+      const stopButton = document.getElementById('stopButton');
+      const refreshOpportunitiesButton = document.getElementById('refreshOpportunitiesButton');
       const prevPageButton = document.getElementById('prevPageButton');
       const nextPageButton = document.getElementById('nextPageButton');
       const pageInfo = document.getElementById('pageInfo');
@@ -630,6 +670,17 @@ function renderUiPage(): string {
         statusSubtitle.textContent = subtitle;
         jobPill.className = 'pill ' + status;
         jobPill.textContent = status;
+      }
+
+      function isJobActive(job) {
+        return job && (job.status === 'running' || job.status === 'stopping');
+      }
+
+      function syncRunControls(job) {
+        const active = isJobActive(job);
+        runButton.disabled = active;
+        stopButton.disabled = !job || !active || job.status === 'stopping';
+        stopButton.textContent = job && job.status === 'stopping' ? 'Stopping…' : 'Stop';
       }
 
       function renderStepList(progress) {
@@ -692,7 +743,17 @@ function renderUiPage(): string {
         const percent = typeof progress.percent === 'number' ? progress.percent : 0;
 
         setStatus(
-          status === 'running' ? 'running' : status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'idle',
+          status === 'running'
+            ? 'running'
+            : status === 'stopping'
+              ? 'stopping'
+              : status === 'completed'
+                ? 'completed'
+                : status === 'cancelled'
+                  ? 'cancelled'
+                  : status === 'failed'
+                    ? 'failed'
+                    : 'idle',
           job ? 'Run #' + job.id : 'No active run',
           job ? 'Progress updates from the backend.' : 'Start a pipeline run to see progress.'
         );
@@ -701,6 +762,7 @@ function renderUiPage(): string {
         progressPercent.textContent = percent + '%';
         progressMessage.textContent = progress.message || 'Waiting.';
         jobTimer.textContent = formatDuration(progress.startedAt, progress.finishedAt);
+        syncRunControls(job);
         renderStepList(progress);
         renderSources(progress);
         renderLogs(progress);
@@ -813,16 +875,15 @@ function renderUiPage(): string {
         const job = await response.json();
         renderProgress(job);
 
-        if (job.status === 'completed' || job.status === 'failed') {
+        if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
           stopPolling();
-          runButton.disabled = false;
           await loadOpportunities(1);
         }
       }
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        runButton.disabled = true;
+        syncRunControls({ status: 'running' });
 
         const keywords = splitCommaSeparated(document.getElementById('keywords').value);
         const webUrls = splitCommaSeparated(document.getElementById('webUrls').value);
@@ -859,12 +920,37 @@ function renderUiPage(): string {
             });
           }, 1500);
         } catch (error) {
-          runButton.disabled = false;
+          syncRunControls(null);
           setStatus('failed', 'Run failed to start', error.message || 'Failed to start pipeline job.');
         }
       });
 
-      refreshButton.addEventListener('click', () => {
+      stopButton.addEventListener('click', async () => {
+        if (!state.activeJobId || !state.currentJob || !isJobActive(state.currentJob)) {
+          return;
+        }
+
+        stopButton.disabled = true;
+
+        try {
+          const response = await fetch('/pipeline/jobs/' + state.activeJobId + '/stop', {
+            method: 'POST'
+          });
+
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.message || 'Failed to stop pipeline job');
+          }
+
+          const job = await response.json();
+          renderProgress(job);
+        } catch (error) {
+          renderProgress(state.currentJob);
+          alert(error.message || 'Failed to stop pipeline job');
+        }
+      });
+
+      refreshOpportunitiesButton.addEventListener('click', () => {
         loadOpportunities(state.opportunitiesPage).catch(() => {
           opportunityList.innerHTML = '<div class="empty">Failed to refresh opportunities.</div>';
         });
@@ -893,7 +979,7 @@ function renderUiPage(): string {
 }
 
 export const registerUiRoute: FastifyPluginAsync = async (app) => {
-  app.get('/', async (_request, reply) => {
-    return reply.type('text/html').send(renderUiPage());
+  app.get("/", async (_request, reply) => {
+    return reply.type("text/html").send(renderUiPage());
   });
 };
