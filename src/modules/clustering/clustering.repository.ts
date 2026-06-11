@@ -7,6 +7,8 @@ interface ClusterRow {
   label: string;
   evidence_count: number;
   source_diversity: number;
+  signal_strength: string;
+  matched_queries: string[];
   latest_evidence_at: Date | null;
   evidence_items: Array<{
     sourceItemId: number;
@@ -23,6 +25,8 @@ function mapClusterRow(row: ClusterRow): ClusterSummary {
     label: row.label,
     evidenceCount: row.evidence_count,
     sourceDiversity: row.source_diversity,
+    signalStrength: Number(row.signal_strength),
+    matchedQueries: row.matched_queries ?? [],
     latestEvidenceAt: row.latest_evidence_at?.toISOString() ?? null,
     evidenceItems: row.evidence_items ?? []
   };
@@ -35,6 +39,8 @@ function buildClusterSummaryQuery(): string {
       pc.label,
       pc.evidence_count,
       COALESCE(stats.source_diversity, 0)::INT AS source_diversity,
+      COALESCE(signal_stats.signal_strength, 0)::TEXT AS signal_strength,
+      COALESCE(query_stats.matched_queries, ARRAY[]::TEXT[]) AS matched_queries,
       stats.latest_evidence_at,
       COALESCE(evidence_items.items, '[]'::JSONB) AS evidence_items
     FROM problem_clusters pc
@@ -50,6 +56,35 @@ function buildClusterSummaryQuery(): string {
       GROUP BY pci.cluster_id
     ) stats
       ON stats.cluster_id = pc.id
+    LEFT JOIN (
+      SELECT
+        pci.cluster_id,
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT si.matched_query), NULL) AS matched_queries
+      FROM problem_cluster_items pci
+      INNER JOIN source_items si
+        ON si.id = pci.source_item_id
+      GROUP BY pci.cluster_id
+    ) query_stats
+      ON query_stats.cluster_id = pc.id
+    LEFT JOIN (
+      SELECT
+        q.cluster_id,
+        COALESCE(SUM(se.signal_value), 0) AS signal_strength
+      FROM (
+        SELECT
+          pci.cluster_id,
+          si.matched_query
+        FROM problem_cluster_items pci
+        INNER JOIN source_items si
+          ON si.id = pci.source_item_id
+        WHERE si.matched_query IS NOT NULL
+        GROUP BY pci.cluster_id, si.matched_query
+      ) q
+      INNER JOIN signal_events se
+        ON se.matched_query = q.matched_query
+      GROUP BY q.cluster_id
+    ) signal_stats
+      ON signal_stats.cluster_id = pc.id
     LEFT JOIN (
       SELECT
         ranked.cluster_id,
@@ -93,7 +128,7 @@ export async function upsertProblemCluster(label: string, summary: string): Prom
       VALUES ($1, $2)
       ON CONFLICT (label) DO UPDATE
       SET summary = EXCLUDED.summary
-      RETURNING id, label, evidence_count, 0::INT AS source_diversity, NULL::TIMESTAMPTZ AS latest_evidence_at, '[]'::JSONB AS evidence_items
+      RETURNING id, label, evidence_count, 0::INT AS source_diversity, '0'::TEXT AS signal_strength, ARRAY[]::TEXT[] AS matched_queries, NULL::TIMESTAMPTZ AS latest_evidence_at, '[]'::JSONB AS evidence_items
     `,
     [label, summary]
   );
@@ -164,4 +199,8 @@ export async function getProblemClusterSummary(clusterId: number): Promise<Clust
   }
 
   return mapClusterRow(row);
+}
+
+export async function resetProblemClusters(): Promise<void> {
+  await pool.query('TRUNCATE TABLE opportunities, problem_cluster_items, problem_clusters RESTART IDENTITY CASCADE');
 }

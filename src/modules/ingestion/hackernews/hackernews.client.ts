@@ -16,11 +16,14 @@ interface HackerNewsSearchResponse {
   hits?: HackerNewsHit[];
 }
 
-export async function searchHackerNews(query: string, limit = 10): Promise<HackerNewsHit[]> {
+export async function searchHackerNews(query: string, limit = 10, afterUnix?: number): Promise<HackerNewsHit[]> {
   const url = new URL('https://hn.algolia.com/api/v1/search_by_date');
   url.searchParams.set('query', query);
   url.searchParams.set('tags', '(story,comment)');
   url.searchParams.set('hitsPerPage', String(limit));
+  if (afterUnix) {
+    url.searchParams.set('numericFilters', `created_at_i>${afterUnix}`);
+  }
 
   const response = await fetch(url, {
     headers: {

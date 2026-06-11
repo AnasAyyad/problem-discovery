@@ -16,6 +16,8 @@ export interface ClusterSummary {
   label: string;
   evidenceCount: number;
   sourceDiversity: number;
+  signalStrength: number;
+  matchedQueries: string[];
   latestEvidenceAt: string | null;
   evidenceItems: ClusterEvidenceItem[];
 }

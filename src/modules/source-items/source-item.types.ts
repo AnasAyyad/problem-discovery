@@ -1,5 +1,6 @@
 export interface SourceItem {
   source: string;
+  sourceKind: 'complaint' | 'signal';
   externalId: string;
   sourceUrl: string;
   title: string | null;
@@ -7,6 +8,8 @@ export interface SourceItem {
   authorName: string | null;
   createdAt: string | null;
   normalizedText: string;
+  matchedQuery: string | null;
+  sourceContext: Record<string, unknown>;
   rawPayload: unknown;
 }
 

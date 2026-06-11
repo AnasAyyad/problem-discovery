@@ -15,7 +15,7 @@ interface RedditListing {
   };
 }
 
-export function mapRedditListing(payload: unknown): SourceItemInput[] {
+export function mapRedditListing(payload: unknown, subreddit: string): SourceItemInput[] {
   const listing = payload as RedditListing;
   const children = listing.data?.children ?? [];
 
@@ -35,6 +35,7 @@ export function mapRedditListing(payload: unknown): SourceItemInput[] {
     return [
       sourceItemSchema.parse({
         source: 'reddit',
+        sourceKind: 'complaint',
         externalId: data.id,
         sourceUrl: `https://www.reddit.com${data.permalink}`,
         title: data.title?.trim() ?? null,
@@ -42,6 +43,10 @@ export function mapRedditListing(payload: unknown): SourceItemInput[] {
         authorName: data.author?.trim() ?? null,
         createdAt: data.created_utc ? new Date(data.created_utc * 1000).toISOString() : null,
         normalizedText: body.replace(/\s+/g, ' ').trim(),
+        matchedQuery: null,
+        sourceContext: {
+          subreddit
+        },
         rawPayload: data
       })
     ];

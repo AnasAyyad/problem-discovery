@@ -68,6 +68,7 @@ export function deriveSignalsFromExtraction(
     evidenceVolume: Math.min(10, Math.max(2, context.evidenceCount * 2)),
     sourceDiversity: Math.min(10, Math.max(1, context.sourceDiversity * 3)),
     extractionConfidence: Math.min(10, Math.max(1, extraction.confidence_score / 10)),
-    recency: deriveRecencyScore(context.latestEvidenceAt)
+    recency: deriveRecencyScore(context.latestEvidenceAt),
+    signalStrength: Math.min(10, Math.max(0, context.signalStrength / 20))
   };
 }

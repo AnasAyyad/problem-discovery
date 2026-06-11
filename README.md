@@ -1,10 +1,10 @@
-# Hunter
+# Product Discovery
 
 Local-first B2B problem discovery app that turns raw complaints into structured opportunity candidates.
 
 ## Purpose
 
-Hunter is meant to help you discover recurring business pain worth building software for.
+Product Discovery is meant to help you discover recurring business pain worth building software for.
 It collects raw source evidence, extracts structured signals with a local model, groups related pain points, and ranks the strongest opportunities for review.
 
 ## Core Idea
@@ -54,7 +54,10 @@ Current sources:
 
 - Reddit hot posts for a target subreddit
 - Hacker News search results using global discovery keywords
+- Stack Exchange advanced search across configured sites
+- GitHub issue search across configured repos/orgs
 - Direct web pages from a configured URL list
+- Disabled-by-default signal connectors for Product Hunt and Google Trends
 
 Reddit is optional. If credentials are missing or Reddit fails, the pipeline now skips or records the failure and continues with the other sources.
 
@@ -77,7 +80,7 @@ Ollama extracts a structured JSON record from each complaint with fields like:
 
 ### 4. Clustering
 
-The app groups extracted items into normalized problem clusters using a normalized problem plus target customer key.
+The app builds problem clusters from embeddings first and falls back to normalized problem plus target customer matching when semantic similarity is unavailable.
 
 ### 5. Scoring
 
@@ -93,6 +96,7 @@ Each cluster is scored using a blend of:
 - source diversity
 - extraction confidence
 - recency
+- signal corroboration from non-complaint sources
 
 ### 6. API
 
@@ -103,6 +107,13 @@ The API exposes:
 - `POST /pipeline/run`
 
 `GET /opportunities` now returns richer evidence context, score breakdowns, cluster evidence counts, and sample evidence links.
+
+The visible opportunity list is thresholded by default using:
+
+- `OPPORTUNITY_MIN_SCORE`
+- `OPPORTUNITY_MIN_CONFIDENCE`
+- `OPPORTUNITY_MIN_EVIDENCE_COUNT`
+- `OPPORTUNITY_MIN_SOURCE_DIVERSITY`
 
 ## Recent Enhancements
 
@@ -120,7 +131,7 @@ Opportunity results now include structured details and evidence samples so the r
 
 ### Better cluster consistency
 
-Cluster labels are normalized before grouping, which reduces fragmentation caused by casing and punctuation differences.
+Cluster labels are normalized before grouping, and embeddings are now used to merge semantically similar evidence for the same target customer when similarity is high enough.
 
 ### Better source consistency
 
@@ -133,12 +144,18 @@ Ingestion is now source-by-source instead of all-or-nothing:
 - Reddit is skipped if credentials are not configured.
 - A failure in one source no longer stops the full pipeline.
 - The ingest step returns per-source status so you can see what was completed, skipped, or failed.
+- Source checkpoints are persisted, so API-backed sources can ingest incrementally instead of always starting from scratch.
+
+### Better visibility control
+
+- Opportunities can still be ignored manually.
+- Low-signal opportunities are hidden automatically unless they meet the configured thresholds.
 
 ## Current Limits
 
 - Reddit still benefits from proper credentials for better coverage.
 - Web ingestion is currently page-fetch based and works best for a curated list of URLs.
-- Clustering is normalized-key based today, not true vector similarity clustering yet.
+- Product Hunt and Google Trends connectors are present as signal-only scaffolding but disabled by default.
 - There are still no automated tests.
 
 ## Source Configuration
@@ -158,6 +175,38 @@ If you do not, the pipeline will skip Reddit and continue.
 Use `DISCOVERY_KEYWORDS` as a comma-separated list, for example:
 
 `DISCOVERY_KEYWORDS=spreadsheet,manual process,inventory,reconciliation,procurement`
+
+### Stack Exchange
+
+Use `STACKEXCHANGE_SITES` as a comma-separated site list, for example:
+
+`STACKEXCHANGE_SITES=stackoverflow,superuser,webapps,workplace`
+
+Optional:
+
+`STACKEXCHANGE_KEY=...`
+
+### GitHub
+
+GitHub issue ingestion is opt-in. Configure:
+
+- `GITHUB_TOKEN`
+- at least one of `GITHUB_ORGS` or `GITHUB_REPOS`
+
+Examples:
+
+`GITHUB_ORGS=openai,microsoft`
+
+`GITHUB_REPOS=supabase/supabase,apache/airflow`
+
+### Signal connectors
+
+Signal-only connectors are disabled by default:
+
+- `PRODUCT_HUNT_ENABLED=false`
+- `GOOGLE_TRENDS_ENABLED=false`
+
+These connectors do not create opportunities directly. They only contribute corroborating signal when enabled and populated.
 
 ### Direct web ingestion
 

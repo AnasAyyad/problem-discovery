@@ -15,6 +15,8 @@ export interface OpportunityRecord {
   scoringBreakdown: unknown;
   evidenceCount: number;
   sourceDiversity: number;
+  signalStrength: number;
+  matchedQueries: string[];
   latestEvidenceAt: string | null;
   evidenceItems: Array<{
     sourceItemId: number;

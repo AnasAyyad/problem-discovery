@@ -12,6 +12,5 @@ export function getDiscoveryKeywords(override?: string[]): string[] {
     return override;
   }
 
-  const configuredKeywords = env.DISCOVERY_KEYWORDS || env.HN_SEARCH_TERMS || '';
-  return parseDiscoveryKeywords(configuredKeywords);
+  return parseDiscoveryKeywords(env.DISCOVERY_KEYWORDS);
 }

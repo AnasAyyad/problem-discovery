@@ -12,7 +12,8 @@ export function scoreOpportunity(signals: OpportunitySignals): OpportunityScores
       signals.abilityToPay * 1.5 +
       signals.reachability * 1 -
       signals.competitionPressure * 0.5 -
-      signals.mvpDifficulty * 0.5
+      signals.mvpDifficulty * 0.5 +
+      signals.signalStrength * 1
   );
 
   const confidenceScore = clampScore(

@@ -9,6 +9,7 @@ export interface IngestionResult {
 
 export interface IngestionSourceResult {
   source: string;
+  kind: 'complaint' | 'signal';
   status: 'completed' | 'skipped' | 'failed';
   fetchedCount: number;
   persistedCount: number;

@@ -10,6 +10,7 @@ export interface OpportunitySignals {
   sourceDiversity: number;
   extractionConfidence: number;
   recency: number;
+  signalStrength: number;
 }
 
 export interface OpportunityScores {
@@ -21,4 +22,5 @@ export interface OpportunityScoringContext {
   evidenceCount: number;
   sourceDiversity: number;
   latestEvidenceAt: string | null;
+  signalStrength: number;
 }

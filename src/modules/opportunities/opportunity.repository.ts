@@ -1,4 +1,5 @@
 import { pool } from '../../db/pool.js';
+import { env } from '../../config/env.js';
 
 import type { OpportunityRecord } from './opportunity.types.js';
 
@@ -19,6 +20,8 @@ interface OpportunityListRow {
   scoring_breakdown: unknown;
   evidence_count: number;
   source_diversity: number;
+  signal_strength: string;
+  matched_queries: string[];
   latest_evidence_at: Date | null;
   evidence_items: Array<{
     sourceItemId: number;
@@ -62,6 +65,8 @@ function toListItem(row: OpportunityListRow): OpportunityRecord {
     scoringBreakdown: row.scoring_breakdown,
     evidenceCount: row.evidence_count,
     sourceDiversity: row.source_diversity,
+    signalStrength: Number(row.signal_strength),
+    matchedQueries: row.matched_queries ?? [],
     latestEvidenceAt: row.latest_evidence_at?.toISOString() ?? null,
     evidenceItems: row.evidence_items ?? []
   };
@@ -140,6 +145,8 @@ export async function listPagedOpportunities(limit = 25, offset = 0): Promise<Op
         o.scoring_breakdown,
         pc.evidence_count,
         COALESCE(stats.source_diversity, 0)::INT AS source_diversity,
+        COALESCE(signal_stats.signal_strength, 0)::TEXT AS signal_strength,
+        COALESCE(query_stats.matched_queries, ARRAY[]::TEXT[]) AS matched_queries,
         stats.latest_evidence_at,
         COALESCE(evidence_items.items, '[]'::JSONB) AS evidence_items
       FROM opportunities o
@@ -156,6 +163,35 @@ export async function listPagedOpportunities(limit = 25, offset = 0): Promise<Op
         GROUP BY pci.cluster_id
       ) stats
         ON stats.cluster_id = o.cluster_id
+      LEFT JOIN (
+        SELECT
+          pci.cluster_id,
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT si.matched_query), NULL) AS matched_queries
+        FROM problem_cluster_items pci
+        INNER JOIN source_items si
+          ON si.id = pci.source_item_id
+        GROUP BY pci.cluster_id
+      ) query_stats
+        ON query_stats.cluster_id = o.cluster_id
+      LEFT JOIN (
+        SELECT
+          q.cluster_id,
+          COALESCE(SUM(se.signal_value), 0) AS signal_strength
+        FROM (
+          SELECT
+            pci.cluster_id,
+            si.matched_query
+          FROM problem_cluster_items pci
+          INNER JOIN source_items si
+            ON si.id = pci.source_item_id
+          WHERE si.matched_query IS NOT NULL
+          GROUP BY pci.cluster_id, si.matched_query
+        ) q
+        INNER JOIN signal_events se
+          ON se.matched_query = q.matched_query
+        GROUP BY q.cluster_id
+      ) signal_stats
+        ON signal_stats.cluster_id = o.cluster_id
       LEFT JOIN (
         SELECT
           ranked.cluster_id,
@@ -190,11 +226,22 @@ export async function listPagedOpportunities(limit = 25, offset = 0): Promise<Op
       ) evidence_items
         ON evidence_items.cluster_id = o.cluster_id
       WHERE o.ignored_at IS NULL
+        AND o.opportunity_score >= $3
+        AND o.confidence_score >= $4
+        AND pc.evidence_count >= $5
+        AND COALESCE(stats.source_diversity, 0)::INT >= $6
       ORDER BY o.opportunity_score DESC, o.confidence_score DESC, o.inserted_at DESC
       LIMIT $1
       OFFSET $2
     `,
-    [limit, offset]
+    [
+      limit,
+      offset,
+      env.OPPORTUNITY_MIN_SCORE,
+      env.OPPORTUNITY_MIN_CONFIDENCE,
+      env.OPPORTUNITY_MIN_EVIDENCE_COUNT,
+      env.OPPORTUNITY_MIN_SOURCE_DIVERSITY
+    ]
   );
 
   return result.rows.map(toListItem);
@@ -205,8 +252,31 @@ export async function countVisibleOpportunities(): Promise<number> {
     `
       SELECT COUNT(*)::TEXT AS count
       FROM opportunities
-      WHERE ignored_at IS NULL
+      INNER JOIN problem_clusters pc
+        ON pc.id = opportunities.cluster_id
+      LEFT JOIN (
+        SELECT
+          pci.cluster_id,
+          COUNT(DISTINCT si.source)::INT AS source_diversity
+        FROM problem_cluster_items pci
+        INNER JOIN source_items si
+          ON si.id = pci.source_item_id
+        GROUP BY pci.cluster_id
+      ) stats
+        ON stats.cluster_id = opportunities.cluster_id
+      WHERE opportunities.ignored_at IS NULL
+        AND opportunities.opportunity_score >= $1
+        AND opportunities.confidence_score >= $2
+        AND pc.evidence_count >= $3
+        AND COALESCE(stats.source_diversity, 0)::INT >= $4
     `
+    ,
+    [
+      env.OPPORTUNITY_MIN_SCORE,
+      env.OPPORTUNITY_MIN_CONFIDENCE,
+      env.OPPORTUNITY_MIN_EVIDENCE_COUNT,
+      env.OPPORTUNITY_MIN_SOURCE_DIVERSITY
+    ]
   );
 
   return Number(result.rows[0]?.count ?? '0');

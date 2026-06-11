@@ -7,7 +7,7 @@ export async function ingestRedditHot(
   limit = 25
 ): Promise<{ subreddit: string; persistedCount: number; fetchedCount: number; }> {
   const payload = await fetchRedditJson(`/r/${subreddit}/hot.json?limit=${limit}`);
-  const items = mapRedditListing(payload);
+  const items = mapRedditListing(payload, subreddit);
   const result = await persistIngestedItems('reddit', items);
 
   return {

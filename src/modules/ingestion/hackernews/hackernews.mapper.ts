@@ -38,6 +38,7 @@ export function mapHackerNewsHits(query: string, hits: HackerNewsHit[]): SourceI
     return [
       sourceItemSchema.parse({
         source: 'hackernews',
+        sourceKind: 'complaint',
         externalId,
         sourceUrl,
         title,
@@ -45,6 +46,10 @@ export function mapHackerNewsHits(query: string, hits: HackerNewsHit[]): SourceI
         authorName: hit.author?.trim() ?? null,
         createdAt: hit.created_at ?? null,
         normalizedText: body.replace(/\s+/g, ' ').trim(),
+        matchedQuery: query,
+        sourceContext: {
+          query
+        },
         rawPayload: {
           ...hit,
           query

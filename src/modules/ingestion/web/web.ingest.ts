@@ -29,6 +29,7 @@ async function buildSourceItem(url: string): Promise<SourceItemInput | null> {
 
   return sourceItemSchema.parse({
     source: 'web',
+    sourceKind: 'complaint',
     externalId: hashText(url),
     sourceUrl: url,
     title,
@@ -36,6 +37,10 @@ async function buildSourceItem(url: string): Promise<SourceItemInput | null> {
     authorName: null,
     createdAt: null,
     normalizedText: body,
+    matchedQuery: null,
+    sourceContext: {
+      url
+    },
     rawPayload: {
       url,
       title

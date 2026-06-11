@@ -18,6 +18,7 @@ async function main(): Promise<void> {
   await runMigrationFile('003_indexes.sql');
   await runMigrationFile('004_pipeline_jobs.sql');
   await runMigrationFile('005_opportunity_ignore.sql');
+  await runMigrationFile('006_source_registry_and_signals.sql');
   await pool.end();
 }
 

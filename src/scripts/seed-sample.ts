@@ -4,6 +4,7 @@ import { insertSourceItem } from '../modules/source-items/source-item.repository
 const samples = [
   {
     source: 'seed',
+    sourceKind: 'complaint',
     externalId: 'seed-procurement-approval-1',
     sourceUrl: 'https://example.local/seed/procurement-approval-1',
     title: 'PO approvals are tracked in spreadsheets',
@@ -11,6 +12,10 @@ const samples = [
     authorName: 'seed-user',
     createdAt: '2026-06-10T00:00:00.000Z',
     normalizedText: 'Our procurement team still uses Excel and email to chase purchase order approvals. It takes hours every week, creates delays, and approvals get missed when managers are traveling.',
+    matchedQuery: 'procurement approval',
+    sourceContext: {
+      kind: 'seed'
+    },
     rawPayload: {
       type: 'seed',
       vertical: 'procurement'
@@ -18,6 +23,7 @@ const samples = [
   },
   {
     source: 'seed',
+    sourceKind: 'complaint',
     externalId: 'seed-inventory-reconciliation-1',
     sourceUrl: 'https://example.local/seed/inventory-reconciliation-1',
     title: 'Warehouse inventory reconciliation is manual',
@@ -25,6 +31,10 @@ const samples = [
     authorName: 'seed-user',
     createdAt: '2026-06-10T00:00:00.000Z',
     normalizedText: 'We manually compare inventory counts between our warehouse system and accounting software every Friday. It is a spreadsheet nightmare and errors cause delayed shipments and angry customers.',
+    matchedQuery: 'inventory reconciliation',
+    sourceContext: {
+      kind: 'seed'
+    },
     rawPayload: {
       type: 'seed',
       vertical: 'inventory'

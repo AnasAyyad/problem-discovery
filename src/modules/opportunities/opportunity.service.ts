@@ -51,7 +51,8 @@ export async function materializeOpportunities(): Promise<{ processedCount: numb
     const signals = deriveSignalsFromExtraction(extraction.extracted, {
       evidenceCount: cluster.evidenceCount,
       sourceDiversity: cluster.sourceDiversity,
-      latestEvidenceAt: cluster.latestEvidenceAt
+      latestEvidenceAt: cluster.latestEvidenceAt,
+      signalStrength: cluster.signalStrength
     });
     const scores = await calculateOpportunityScores(signals);
 
