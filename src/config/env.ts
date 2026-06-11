@@ -11,6 +11,7 @@ const envSchema = z.object({
   OLLAMA_BASE_URL: z.url().default('http://127.0.0.1:11434'),
   OLLAMA_CHAT_MODEL: z.string().min(1),
   OLLAMA_EMBED_MODEL: z.string().min(1),
+  EXTRACTION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   INGEST_USER_AGENT: z.string().min(1).default('hunter/0.1'),
   REDDIT_CLIENT_ID: z.string().optional(),
   REDDIT_CLIENT_SECRET: z.string().optional(),

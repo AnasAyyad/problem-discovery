@@ -16,3 +16,9 @@ export interface OpportunityScores {
   opportunityScore: number;
   confidenceScore: number;
 }
+
+export interface OpportunityScoringContext {
+  evidenceCount: number;
+  sourceDiversity: number;
+  latestEvidenceAt: string | null;
+}

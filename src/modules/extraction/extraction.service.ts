@@ -18,7 +18,12 @@ export async function extractPendingSourceItems(limit = 10): Promise<{
   successCount: number;
   failureCount: number;
 }> {
-  const items = await listPendingExtractionSourceItems(env.OLLAMA_CHAT_MODEL, EXTRACTION_PROMPT_VERSION, limit);
+  const items = await listPendingExtractionSourceItems(
+    env.OLLAMA_CHAT_MODEL,
+    EXTRACTION_PROMPT_VERSION,
+    env.EXTRACTION_MAX_ATTEMPTS,
+    limit
+  );
   let successCount = 0;
   let failureCount = 0;
 

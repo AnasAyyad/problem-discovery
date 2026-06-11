@@ -1,7 +1,7 @@
 import type { ExtractionResult } from '../extraction/extraction.schema.js';
 
 import { scoreOpportunity } from './scoring.rules.js';
-import type { OpportunityScores, OpportunitySignals } from './scoring.types.js';
+import type { OpportunityScores, OpportunityScoringContext, OpportunitySignals } from './scoring.types.js';
 
 export async function calculateOpportunityScores(signals: OpportunitySignals): Promise<OpportunityScores> {
   return scoreOpportunity(signals);
@@ -12,7 +12,36 @@ function containsAny(value: string, keywords: string[]): boolean {
   return keywords.some((keyword) => lower.includes(keyword));
 }
 
-export function deriveSignalsFromExtraction(extraction: ExtractionResult, evidenceCount: number): OpportunitySignals {
+function deriveRecencyScore(latestEvidenceAt: string | null): number {
+  if (!latestEvidenceAt) {
+    return 3;
+  }
+
+  const ageInDays = (Date.now() - new Date(latestEvidenceAt).getTime()) / (1000 * 60 * 60 * 24);
+
+  if (ageInDays <= 7) {
+    return 10;
+  }
+
+  if (ageInDays <= 30) {
+    return 8;
+  }
+
+  if (ageInDays <= 90) {
+    return 6;
+  }
+
+  if (ageInDays <= 180) {
+    return 4;
+  }
+
+  return 2;
+}
+
+export function deriveSignalsFromExtraction(
+  extraction: ExtractionResult,
+  context: OpportunityScoringContext
+): OpportunitySignals {
   const painText = [
     extraction.pain_description,
     extraction.business_impact,
@@ -30,15 +59,15 @@ export function deriveSignalsFromExtraction(extraction: ExtractionResult, eviden
 
   return {
     painLevel,
-    frequency: Math.min(10, Math.max(3, evidenceCount * 2)),
+    frequency: Math.min(10, Math.max(3, context.evidenceCount * 2)),
     businessImpact,
     abilityToPay,
     reachability,
     competitionPressure,
     mvpDifficulty,
-    evidenceVolume: Math.min(10, Math.max(2, evidenceCount * 2)),
-    sourceDiversity: 3,
+    evidenceVolume: Math.min(10, Math.max(2, context.evidenceCount * 2)),
+    sourceDiversity: Math.min(10, Math.max(1, context.sourceDiversity * 3)),
     extractionConfidence: Math.min(10, Math.max(1, extraction.confidence_score / 10)),
-    recency: 7
+    recency: deriveRecencyScore(context.latestEvidenceAt)
   };
 }

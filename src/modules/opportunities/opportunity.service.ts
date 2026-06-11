@@ -1,12 +1,13 @@
 import { buildProblemClusters } from '../clustering/clustering.service.js';
+import { buildClusterLabel } from '../clustering/clustering.service.js';
 import { listLatestSuccessfulExtractions } from '../extraction/extraction.repository.js';
 import { calculateOpportunityScores, deriveSignalsFromExtraction } from '../scoring/scoring.service.js';
 
 import { listTopOpportunities } from './opportunity.repository.js';
 import { upsertOpportunity } from './opportunity.repository.js';
 
-export async function getOpportunities() {
-  return listTopOpportunities();
+export async function getOpportunities(limit?: number) {
+  return listTopOpportunities(limit);
 }
 
 export async function materializeOpportunities(): Promise<{ processedCount: number; clusterCount: number; }> {
@@ -16,14 +17,18 @@ export async function materializeOpportunities(): Promise<{ processedCount: numb
   let processedCount = 0;
 
   for (const extraction of extractions) {
-    const label = `${extraction.extracted.problem} :: ${extraction.extracted.target_customer}`;
+    const label = buildClusterLabel(extraction.extracted.problem, extraction.extracted.target_customer);
     const cluster = clusterByLabel.get(label);
 
     if (!cluster) {
       continue;
     }
 
-    const signals = deriveSignalsFromExtraction(extraction.extracted, cluster.evidenceCount);
+    const signals = deriveSignalsFromExtraction(extraction.extracted, {
+      evidenceCount: cluster.evidenceCount,
+      sourceDiversity: cluster.sourceDiversity,
+      latestEvidenceAt: cluster.latestEvidenceAt
+    });
     const scores = await calculateOpportunityScores(signals);
 
     await upsertOpportunity({

@@ -25,6 +25,7 @@ export interface SourceItemTextRow {
   title: string | null;
   body: string;
   normalized_text: string;
+  created_at: Date | null;
 }
 
 function mapRow(row: SourceItemRow): PersistedSourceItem {
@@ -68,6 +69,7 @@ export async function insertSourceItem(input: SourceItemInput): Promise<Persiste
         author_name = EXCLUDED.author_name,
         created_at = EXCLUDED.created_at,
         normalized_text = EXCLUDED.normalized_text,
+        content_hash = EXCLUDED.content_hash,
         raw_payload = EXCLUDED.raw_payload
       RETURNING id, source, external_id, source_url, title, body, author_name, created_at, normalized_text, content_hash, inserted_at
     `,
@@ -129,22 +131,30 @@ export async function listPendingEmbeddingSourceItems(modelName: string, limit =
 export async function listPendingExtractionSourceItems(
   modelName: string,
   promptVersion: string,
+  maxAttempts: number,
   limit = 25
 ): Promise<SourceItemTextRow[]> {
   const result = await pool.query<SourceItemTextRow>(
     `
-      SELECT si.id, si.source, si.source_url, si.title, si.body, si.normalized_text
+      SELECT si.id, si.source, si.source_url, si.title, si.body, si.normalized_text, si.created_at
       FROM source_items si
-      LEFT JOIN evidence_extractions ee
+      LEFT JOIN (
+        SELECT
+          source_item_id,
+          COUNT(*)::INT AS attempt_count,
+          BOOL_OR(parse_success) AS has_success
+        FROM evidence_extractions
+        WHERE model_name = $1
+          AND prompt_version = $2
+        GROUP BY source_item_id
+      ) ee
         ON ee.source_item_id = si.id
-       AND ee.model_name = $1
-       AND ee.prompt_version = $2
-       AND ee.parse_success = TRUE
-      WHERE ee.id IS NULL
+      WHERE COALESCE(ee.has_success, FALSE) = FALSE
+        AND COALESCE(ee.attempt_count, 0) < $3
       ORDER BY si.inserted_at ASC
-      LIMIT $3
+      LIMIT $4
     `,
-    [modelName, promptVersion, limit]
+    [modelName, promptVersion, maxAttempts, limit]
   );
 
   return result.rows;
