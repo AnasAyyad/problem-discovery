@@ -1,5 +1,5 @@
 {
-  "name": "hunter",
+  "name": "product-discovery",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
+    "db:clear": "tsx src/scripts/clear-db.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "pipeline:run": "tsx src/scripts/run-pipeline.ts",
     "ingest:run": "tsx src/scripts/run-ingestion.ts",
