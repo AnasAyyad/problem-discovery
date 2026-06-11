@@ -1,6 +1,7 @@
 export interface OpportunityRecord {
   id: number;
   clusterId: number;
+  ignoredAt: string | null;
   problem: string;
   targetCustomer: string;
   painDescription: string;

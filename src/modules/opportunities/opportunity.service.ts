@@ -3,11 +3,35 @@ import { buildClusterLabel } from '../clustering/clustering.service.js';
 import { listLatestSuccessfulExtractions } from '../extraction/extraction.repository.js';
 import { calculateOpportunityScores, deriveSignalsFromExtraction } from '../scoring/scoring.service.js';
 
+import { countVisibleOpportunities } from './opportunity.repository.js';
+import { ignoreOpportunity } from './opportunity.repository.js';
+import { listPagedOpportunities } from './opportunity.repository.js';
 import { listTopOpportunities } from './opportunity.repository.js';
 import { upsertOpportunity } from './opportunity.repository.js';
 
 export async function getOpportunities(limit?: number) {
   return listTopOpportunities(limit);
+}
+
+export async function getOpportunityPage(limit = 5, page = 1) {
+  const safeLimit = Math.max(1, limit);
+  const safePage = Math.max(1, page);
+  const total = await countVisibleOpportunities();
+  const items = await listPagedOpportunities(safeLimit, (safePage - 1) * safeLimit);
+
+  return {
+    items,
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit))
+    }
+  };
+}
+
+export async function hideOpportunity(opportunityId: number): Promise<void> {
+  await ignoreOpportunity(opportunityId);
 }
 
 export async function materializeOpportunities(): Promise<{ processedCount: number; clusterCount: number; }> {

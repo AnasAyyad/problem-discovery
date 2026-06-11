@@ -5,6 +5,7 @@ import type { OpportunityRecord } from './opportunity.types.js';
 interface OpportunityListRow {
   id: number;
   cluster_id: number;
+  ignored_at: Date | null;
   problem: string;
   target_customer: string;
   pain_description: string;
@@ -47,6 +48,7 @@ function toListItem(row: OpportunityListRow): OpportunityRecord {
   return {
     id: row.id,
     clusterId: row.cluster_id,
+    ignoredAt: row.ignored_at?.toISOString() ?? null,
     problem: row.problem,
     targetCustomer: row.target_customer,
     painDescription: row.pain_description,
@@ -115,11 +117,16 @@ export async function upsertOpportunity(input: OpportunityUpsertInput): Promise<
 }
 
 export async function listTopOpportunities(limit = 25): Promise<OpportunityRecord[]> {
+  return listPagedOpportunities(limit, 0);
+}
+
+export async function listPagedOpportunities(limit = 25, offset = 0): Promise<OpportunityRecord[]> {
   const result = await pool.query<OpportunityListRow>(
     `
       SELECT
         o.id,
         o.cluster_id,
+        o.ignored_at,
         o.problem,
         o.target_customer,
         o.pain_description,
@@ -182,11 +189,36 @@ export async function listTopOpportunities(limit = 25): Promise<OpportunityRecor
         GROUP BY ranked.cluster_id
       ) evidence_items
         ON evidence_items.cluster_id = o.cluster_id
+      WHERE o.ignored_at IS NULL
       ORDER BY o.opportunity_score DESC, o.confidence_score DESC, o.inserted_at DESC
       LIMIT $1
+      OFFSET $2
     `,
-    [limit]
+    [limit, offset]
   );
 
   return result.rows.map(toListItem);
+}
+
+export async function countVisibleOpportunities(): Promise<number> {
+  const result = await pool.query<{ count: string }>(
+    `
+      SELECT COUNT(*)::TEXT AS count
+      FROM opportunities
+      WHERE ignored_at IS NULL
+    `
+  );
+
+  return Number(result.rows[0]?.count ?? '0');
+}
+
+export async function ignoreOpportunity(opportunityId: number): Promise<void> {
+  await pool.query(
+    `
+      UPDATE opportunities
+      SET ignored_at = NOW()
+      WHERE id = $1
+    `,
+    [opportunityId]
+  );
 }
